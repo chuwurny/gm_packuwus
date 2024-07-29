@@ -1,6 +1,6 @@
 AddCSLuaFile()
 
-PackUwUs = {}
+PackUwUs = PackUwUs or {}
 PackUwUs.PACKED_TEMP_PATH = "packuwus/packed.dat"
 PackUwUs.packuwus_packed_path = CreateConVar("packuwus_packed_path", "", FCVAR_REPLICATED)
 
@@ -11,7 +11,7 @@ PackUwUs.packuwus_packed_path = CreateConVar("packuwus_packed_path", "", FCVAR_R
     CLIENT:
     { string path = string content }
 ]]
-PackUwUs.Files = {}
+PackUwUs.Files = PackUwUs.Files or {}
 
 local files = PackUwUs.Files
 

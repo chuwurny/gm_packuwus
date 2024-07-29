@@ -1,5 +1,6 @@
-PackUwUs.NeedToRepack = false
-PackUwUs.Ready = false
+PackUwUs.NeedToRepack = PackUwUs.NeedToRepack or false
+PackUwUs.Ready        = PackUwUs.Ready or false
+PackUwUs.PackThread   = PackUwUs.PackThread or nil
 
 local files = PackUwUs.Files
 
@@ -103,13 +104,28 @@ function PackUwUs.AddSendTxt(filepath, path)
     return true
 end
 
-function PackUwUs.Pack()
+function PackUwUs.PackAsync()
+    local curThread = coroutine.running()
+
+    if curThread == nil then
+        return err("Prevent packing: PackUwUs.PackAsync must run in thread!")
+    end
+
+    if PackUwUs.PackThread then
+        return warn("Prevent packing: pack thread is active")
+    end
+
     if PackUwUs.NeedToRepack then
         warn("NeedToRepack is set to false, but we're packing?")
     end
 
-    PackUwUs.NeedToRepack = false
     timer.Remove("packuwus autorepack")
+
+    PackUwUs.PackThread = curThread
+
+    ::REPACK::
+
+    PackUwUs.NeedToRepack = false
 
     local packFileHandle = file.Open(PackUwUs.PACKED_TEMP_PATH, "wb", "DATA")
 
@@ -143,6 +159,16 @@ function PackUwUs.Pack()
         else
             warn("Failed to add %s (%s) to pack: cannot open file", path, fixedPath)
         end
+
+        coroutine.yield()
+
+        if PackUwUs.NeedToRepack then
+            warn("NeedToRepack is set while packing files, start repacking...")
+
+            packFileHandle:Close()
+
+            goto REPACK
+        end
     end
 
     packFileHandle:Close()
@@ -161,7 +187,62 @@ function PackUwUs.Pack()
 
     PackUwUs.packuwus_packed_path:SetString(hash)
 
+    PackUwUs.PackThread = nil
+
     return true
+end
+
+function PackUwUs.Pack(async)
+    if PackUwUs.PackThread then
+        return warn("Prevent sync packing: pack thread is active")
+    end
+
+    local packThread = coroutine.create(PackUwUs.PackAsync)
+    local totalCpuTime = 0
+
+    local function resume()
+        local resumeStartTime = SysTime()
+
+        local noErrors, result = coroutine.resume(packThread)
+
+        if not noErrors then
+            err("Pack thread failed: %s\n%s", result, debug.traceback(packThread))
+
+            PackUwUs.PackThread = nil
+
+            return false
+        elseif result then
+            ok("Pack completed! CPU time: %.2f", totalCpuTime)
+
+            return false
+        elseif result == false then
+            err("Pack failed!")
+
+            PackUwUs.PackThread = nil
+
+            return false
+        end
+
+        totalCpuTime = totalCpuTime + (SysTime() - resumeStartTime)
+
+        return true
+    end
+
+    if async ~= false then
+        local timeLimit = engine.TickInterval() / 2
+
+        timer.Create("packuwus pack thread worker", 0, 0, function()
+            local startTime = SysTime()
+
+            while (SysTime() - startTime) < timeLimit do
+                if not resume() then
+                    return timer.Remove("packuwus pack thread worker")
+                end
+            end
+        end)
+    else
+        while resume() do end
+    end
 end
 
 function PackUwUs.DumpFileList()

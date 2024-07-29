@@ -29,17 +29,21 @@ function PackUwUs_ModifyContent(path, code)
     return "return unpackMeUwU()()"
 end
 
-require("hook")
+if not PackUwUs.Ready then
+    require("hook")
 
-hook.Add("InitPostEntity", "packuwus init", function()
-    hook.Remove("InitPostEntity", "packuwus init")
+    PackUwUs.AddSendTxt("lua/send.txt", "GAME")
 
-    PackUwUs.Ready = true
+    hook.Add("InitPostEntity", "packuwus init", function()
+        hook.Remove("InitPostEntity", "packuwus init")
 
-    PackUwUs.DumpFileList()
-    PackUwUs.Pack()
-end)
+        PackUwUs.Ready = true
 
-PackUwUs.AddSendTxt("lua/send.txt", "GAME")
+        PackUwUs.DumpFileList()
+        PackUwUs.Pack(false)
+    end)
 
-require("packuwus")
+    require("packuwus")
+else
+    PackUwUs.MarkToRepack()
+end
