@@ -6,4 +6,6 @@ include("includes/_init.lua")
 
 if CLIENT then
     include("packuwus/cl_debug_helpers.lua")
+else
+    include("packuwus/sv_debug_helpers.lua")
 end
