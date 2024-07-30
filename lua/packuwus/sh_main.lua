@@ -138,19 +138,21 @@ end
 AddCSLuaFile("packuwus/sh_utils.lua")
 AddCSLuaFile("packuwus/cl_main.lua")
 AddCSLuaFile("packuwus/cl_impl.lua")
+AddCSLuaFile("packuwus/cl_startup.lua")
 
 include("packuwus/sh_utils.lua")
 
 if CLIENT then
     include("packuwus/cl_main.lua")
     include("packuwus/cl_impl.lua")
-    --include("packuwus/cl_overrides.lua")
+    include("packuwus/cl_startup.lua")
 end
 
 if SERVER then
     include("packuwus/sv_utils.lua")
     include("packuwus/sv_main.lua")
     include("packuwus/sv_impl.lua")
+    include("packuwus/sv_startup.lua")
 end
 
 -- adding them cus we want them pack

@@ -9,7 +9,11 @@ local err = PackUwUs.Error
 function PackUwUs.GetPackedFilePath()
     local filename = "download/data/serve_packuwus/" .. PackUwUs.packuwus_packed_path:GetString() .. ".bsp"
 
-    assert(file.Exists(filename, "GAME"), "Packed file path doesn't exist!")
+    if not file.Exists(filename, "GAME") then
+        err("Cannot get packed file path: packed file doesn't exist!")
+
+        return nil
+    end
 
     return filename
 end
@@ -42,6 +46,13 @@ function PackUwUs.Unpack()
     end
 
     local packedFilePath = PackUwUs.GetPackedFilePath()
+
+    if not packedFilePath then
+        err("Failed to unpack: no packed file!")
+
+        return false
+    end
+
     local f = file.Open(packedFilePath, "rb", "GAME")
 
     if not f then
@@ -124,50 +135,31 @@ function PackUwUs.LoadFile(path)
     return CompileString(content, path)
 end
 
-function PackUwUs.HealthCheck()
-    local function disconnect(msg)
-        PackUwUs_HealthCheck_Message = msg
+function PackUwUs.FatalError(msg)
+    err("FATAL ERROR: %s", msg)
 
-        err("FATAL ERROR: health check failed: %s", msg)
-
-        gui.OpenURL("http://" .. string.rep(" ", 70) .. msg)
-
-        RunConsoleCommand("disconnect")
-
-        return false
+    if PackUwUs.FatalFuckUp then
+        return -- already fucked up, stop.
     end
 
-    local lang = GetConVar("gmod_language"):GetString()
+    PackUwUs.FatalFuckUp = true
 
-    if not ({
-            ["all"] = true,
-            ["nosounds"] = true,
-            ["mapsonly"] = true,
-            ["noworkshop"] = true,
-        })[GetConVar("cl_downloadfilter"):GetString()]
-    then
-        local msg
+    gui.OpenURL("http://" .. string.rep(" ", 70) .. msg)
 
-        if lang == "ru" then
-            msg = "Введи    cl_downloadfilter all    в консоль чтобы загрузиться на сервер!"
-        else -- fallback to english
-            msg = "Enter    cl_downloadfilter all    in console to correctly load on the server!"
-        end
+    RunConsoleCommand("disconnect")
 
-        return disconnect(msg)
+    function unpackMeUwU()
+        ErrorNoHalt(
+            "\n\n!!!!!!!!!!!!!!!!!!!!\n\n" ..
+            string.rep(" ", 20) .. msg ..
+            "\n\n!!!!!!!!!!!!!!!!!!!!\n" ..
+            math.random() .. "\n\n\n"
+        )
+
+        return function() end
     end
 
-    if not file.Exists(PackUwUs.GetPackedFilePath(), "GAME") then
-        local msg
-
-        if lang == "ru" then
-            msg = "Не удалось скачать запакованные луа файлы!"
-        else -- fallback to english
-            msg = "Failed to download packed lua files!"
-        end
-
-        return disconnect(msg)
-    end
-
-    return true
+    require("gamemode")
+    require("scripted_ents")
+    require("weapons")
 end
