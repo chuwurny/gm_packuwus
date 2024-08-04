@@ -70,7 +70,8 @@ function PackUwUs.ShouldPack(path)
             return subpath ~= "sh_main.lua" and
                 subpath ~= "cl_main.lua" and
                 subpath ~= "cl_impl.lua" and
-                subpath ~= "sh_utils.lua"
+                subpath ~= "sh_utils.lua" and
+                subpath ~= "cl_startup.lua"
         end
     end
 
