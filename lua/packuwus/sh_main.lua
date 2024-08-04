@@ -33,8 +33,8 @@ end
 local CowoR_CUTE    = { r = 225, g = 150, b = 255, a = 255 }
 local COLOR_DEBUG   = { r = 155, g = 230, b = 255, a = 255 }
 local COLOR_DEFAULT = { r = 255, g = 255, b = 255, a = 255 }
-local COLOR_OK      = { r = 0, g = 255, b = 150, a = 255 }
-local COLOR_WARNING = { r = 255, g = 150, b = 0, a = 255 }
+local COLOR_OK      = { r = 0,   g = 255, b = 150, a = 255 }
+local COLOR_WARNING = { r = 255, g = 150, b = 0,   a = 255 }
 local COLOR_ERROR   = { r = 255, g = 150, b = 150, a = 255 }
 
 function PackUwUs.LogEx(level, color, fmt, ...)
