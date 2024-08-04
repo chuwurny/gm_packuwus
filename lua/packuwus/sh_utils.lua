@@ -61,5 +61,5 @@ end
 function PackUwUs.Lang(lookupTable)
     local lang = GetConVar("gmod_language"):GetString()
 
-    return lookupTable[lang] or lookupTable.en or next(lookupTable)
+    return lookupTable[lang] or lookupTable.en or select(2, next(lookupTable))
 end
