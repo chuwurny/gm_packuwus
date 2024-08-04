@@ -57,3 +57,9 @@ function PackUwUs.Lines(str, keepEmpty)
 
     return lines
 end
+
+function PackUwUs.Lang(lookupTable)
+    local lang = GetConVar("gmod_language"):GetString()
+
+    return lookupTable[lang] or lookupTable.en or next(lookupTable)
+end
