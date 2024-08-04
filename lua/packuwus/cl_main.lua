@@ -129,6 +129,8 @@ function PackUwUs.LoadFile(path)
     local content = files[fixedPath]
 
     if not content then
+        err("Failed to load file %s: not in file list", fixedPath)
+
         error("Failed to load file " .. fixedPath .. ": not in file list")
     end
 
