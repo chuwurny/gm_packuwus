@@ -316,7 +316,7 @@ unsafe fn serve_file(lua: State) -> i32 {
     for index in 0..DOWNLOADABLES_TABLE.as_ref().unwrap().num_strings() {
         let str = DOWNLOADABLES_TABLE.as_ref().unwrap().string(index).unwrap();
 
-        if str.to_string_lossy().starts_with("data/packuwus/") {
+        if str.to_string_lossy().starts_with("data/serve_packuwus/") {
             downloadable_filepath = Some(str);
 
             break;
