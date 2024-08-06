@@ -7,7 +7,6 @@ edition = "2021"
 crate-type = ["cdylib"]
 
 [dependencies]
-cxx = "1.0.124"
 gmod = "17.0.0"
 gmod-lzma = "1.0.1"
 goblin = "0.8.2"
