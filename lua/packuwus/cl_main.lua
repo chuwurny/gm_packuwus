@@ -8,7 +8,6 @@ local files = PackUwUs.Files
 local log = PackUwUs.Log
 local dbg = PackUwUs.Debug
 local ok = PackUwUs.Ok
-local warn = PackUwUs.Warn
 local err = PackUwUs.Error
 
 function PackUwUs.HasFile(path)

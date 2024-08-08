@@ -1,4 +1,3 @@
-local sub = string.sub
 local gsub = string.gsub
 
 local function trimLineSpaces(lines)

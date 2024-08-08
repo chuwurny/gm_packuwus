@@ -2,10 +2,7 @@ PackUwUs.NeedToRepack = PackUwUs.NeedToRepack or false
 PackUwUs.Ready        = PackUwUs.Ready or false
 PackUwUs.Packing      = PackUwUs.Packing or false
 
-local files = PackUwUs.Files
-
 local log = PackUwUs.Log
-local dbg = PackUwUs.Debug
 local warn = PackUwUs.Warn
 local ok = PackUwUs.Ok
 local err = PackUwUs.Error
