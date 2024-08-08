@@ -300,7 +300,7 @@ unsafe fn start_sync_thread(lua: State) {
 
             if !lua.pcall_ignore(4, 0) {
                 lua.error(format!(
-                    "Failed to setup lua sync thread: _G.timer.Create errored!"
+                    "Failed to setup lua sync thread: error occured in _G.timer.Create!"
                 ));
             }
         } else {
@@ -334,7 +334,7 @@ unsafe fn stop_sync_thread(lua: State) {
 
             if !lua.pcall_ignore(1, 0) {
                 lua.error(format!(
-                    "Failed to stop lua sync thread: _G.timer.Remove errored!"
+                    "Failed to stop lua sync thread: error occured in _G.timer.Remove!"
                 ));
             }
         } else {
