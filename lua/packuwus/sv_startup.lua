@@ -1,18 +1,18 @@
 if not PackUwUs.Ready then
     require("hook")
 
-    PackUwUs.AddSendTxt("lua/send.txt", "GAME")
-
     hook.Add("InitPostEntity", "packuwus init", function()
         hook.Remove("InitPostEntity", "packuwus init")
 
         PackUwUs.Ready = true
 
-        PackUwUs.DumpFileList()
-        PackUwUs.Pack(false)
+        PackUwUs.Pack()
+        PackUwUs_SetPackContent("return unpackMeUwU()()")
     end)
 
+    PackUwUs.Log("Loading internal module...")
     require("packuwus")
+    PackUwUs.Ok("Internal module loaded!")
 else
-    PackUwUs.MarkToRepack()
+    PackUwUs.Pack()
 end

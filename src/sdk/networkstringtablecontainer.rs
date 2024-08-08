@@ -1,8 +1,6 @@
 use std::ffi::{c_char, c_void, CString, NulError};
 
-use super::networkstringtable::{
-    NetworkStringTable, WrappedNetworkStringTable,
-};
+use super::networkstringtable::{NetworkStringTable, WrappedNetworkStringTable};
 
 #[repr(C)]
 #[derive(Debug)]
@@ -28,19 +26,13 @@ pub struct NetworkStringTableContainer {
 }
 
 #[derive(Debug)]
-pub struct WrappedNetworkStringTableContainer(
-    pub *const NetworkStringTableContainer,
-);
+pub struct WrappedNetworkStringTableContainer(pub *const NetworkStringTableContainer);
 
 impl<'a> WrappedNetworkStringTableContainer {
-    pub fn find_table(
-        &self,
-        name: &str,
-    ) -> Result<Option<WrappedNetworkStringTable>, NulError> {
+    pub fn find_table(&self, name: &str) -> Result<Option<WrappedNetworkStringTable>, NulError> {
         let name = CString::new(name)?;
 
-        let table =
-            unsafe { ((*(*self.0).vtable).find_table)(self.0, name.as_ptr()) };
+        let table = unsafe { ((*(*self.0).vtable).find_table)(self.0, name.as_ptr()) };
 
         if !table.is_null() {
             Ok(Some(WrappedNetworkStringTable(table)))

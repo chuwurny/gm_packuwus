@@ -58,9 +58,7 @@ pub(crate) struct Module {
 
 #[allow(dead_code)]
 impl Module {
-    pub fn from_mem_map(
-        mem_map: &MemoryMap,
-    ) -> Result<Module, ModuleFromMemMapError> {
+    pub fn from_mem_map(mem_map: &MemoryMap) -> Result<Module, ModuleFromMemMapError> {
         match &mem_map.pathname {
             procfs::process::MMapPath::Path(path) => Ok(Module {
                 path: path.as_path().to_owned(),
@@ -84,8 +82,7 @@ impl Module {
                     match map_path.as_path().components().last() {
                         Some(map_last_component) => match map_last_component {
                             Component::Normal(map_filename) => {
-                                return map_filename.to_str().unwrap_or("")
-                                    == filename
+                                return map_filename.to_str().unwrap_or("") == filename
                             }
                             _ => false,
                         },
@@ -95,31 +92,25 @@ impl Module {
                 _ => false,
             })
         {
-            Module::from_mem_map(&map)
-                .or_else(|err| Err(ModuleFromProcessError::MemMap(err)))
+            Module::from_mem_map(&map).or_else(|err| Err(ModuleFromProcessError::MemMap(err)))
         } else {
             Err(ModuleFromProcessError::NotFound)
         }
     }
 
     unsafe fn memory_slice(&self) -> &[u8] {
-        std::slice::from_raw_parts(
-            self.start_address as *const u8,
-            self.size as usize,
-        )
+        std::slice::from_raw_parts(self.start_address as *const u8, self.size as usize)
     }
 
     pub fn symbol(&self, name: &str) -> Result<*const c_void, SymbolError> {
-        let mut file = File::open(&self.path)
-            .or_else(|err| Err(SymbolError::OpenFile(err)))?;
+        let mut file = File::open(&self.path).or_else(|err| Err(SymbolError::OpenFile(err)))?;
 
         let mut buf = vec![];
 
         file.read_to_end(&mut buf)
             .or_else(|err| Err(SymbolError::ReadFile(err)))?;
 
-        let elf =
-            Elf::parse(&buf).or_else(|err| Err(SymbolError::ParseFile(err)))?;
+        let elf = Elf::parse(&buf).or_else(|err| Err(SymbolError::ParseFile(err)))?;
 
         Ok(elf
             .syms
@@ -137,20 +128,12 @@ impl Module {
     }
 
     pub fn interface<T>(&self, name: &str) -> Result<*const T, InterfaceError> {
-        let name = CString::new(name)
-            .or_else(|_| Err(InterfaceError::UnexpectedNulInName))?;
+        let name = CString::new(name).or_else(|_| Err(InterfaceError::UnexpectedNulInName))?;
 
         Ok(unsafe {
-            transmute::<
-                _,
-                unsafe extern "C" fn(
-                    *const c_char,
-                    *mut c_int,
-                ) -> *const c_void,
-            >(
-                self.symbol("CreateInterface").or_else(|err| {
-                    Err(InterfaceError::FailedToFindSymbol(err))
-                })?,
+            transmute::<_, unsafe extern "C" fn(*const c_char, *mut c_int) -> *const c_void>(
+                self.symbol("CreateInterface")
+                    .or_else(|err| Err(InterfaceError::FailedToFindSymbol(err)))?,
             )(name.as_ptr(), null_mut()) as *const T
         })
     }

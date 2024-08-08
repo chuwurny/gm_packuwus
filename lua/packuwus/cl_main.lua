@@ -1,3 +1,8 @@
+--[[
+    { string path = string content }
+]]
+PackUwUs.Files = PackUwUs.Files or {}
+
 local files = PackUwUs.Files
 
 local log = PackUwUs.Log
@@ -6,8 +11,14 @@ local ok = PackUwUs.Ok
 local warn = PackUwUs.Warn
 local err = PackUwUs.Error
 
+function PackUwUs.HasFile(path)
+    local fixedPath = PackUwUs.FixPath(path)
+
+    return files[fixedPath] ~= nil
+end
+
 function PackUwUs.GetPackedFilePath()
-    local filename = "download/data/serve_packuwus/" .. PackUwUs.packuwus_packed_path:GetString() .. ".bsp"
+    local filename = "download/data/serve_packuwus/" .. PackUwUs.packuwus_hash:GetString() .. ".bsp"
 
     if not file.Exists(filename, "GAME") then
         err("Cannot get packed file path: packed file doesn't exist!")

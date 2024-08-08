@@ -24,9 +24,9 @@ pub struct NetworkStringTableVTable {
         c_int,
         *const c_void,
     ) -> c_int,
-    pub string:
-        unsafe extern "C" fn(*const NetworkStringTable, c_int) -> *const c_char,
-    pub set_string_userdata: *const c_void,
+    pub string: unsafe extern "C" fn(*const NetworkStringTable, c_int) -> *const c_char,
+    pub set_string_userdata:
+        unsafe extern "C" fn(*const NetworkStringTable, c_int, c_int, *const c_void),
     pub string_userdata: *const c_void,
     pub find_string_index: *const c_void,
     pub set_string_changed_callback: *const c_void,
@@ -46,7 +46,7 @@ pub struct NetworkStringTable {
     pub items_clientside: *const NetworkStringDict,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct WrappedNetworkStringTable(pub *const NetworkStringTable);
 
 impl<'a> WrappedNetworkStringTable {
@@ -72,14 +72,33 @@ impl<'a> WrappedNetworkStringTable {
         unsafe { WrappedNetworkStringDict((*self.0).items) }
     }
 
-    pub fn add_string(&self, server: bool, value: &CStr) -> i32 {
+    pub fn add_string(&self, server: bool, value: &CStr, user_data: Option<&[u8]>) -> i32 {
         unsafe {
             ((*(*self.0).vtable).add_string)(
                 self.0,
                 server,
                 value.as_ptr(),
-                -1,
-                null(),
+                if let Some(user_data) = user_data {
+                    user_data.len() as _
+                } else {
+                    -1
+                },
+                if let Some(userdata) = user_data {
+                    userdata.as_ptr() as _
+                } else {
+                    null()
+                },
+            )
+        }
+    }
+
+    pub fn set_string_userdata(&self, index: i32, userdata: &[u8]) {
+        unsafe {
+            ((*(*self.0).vtable).set_string_userdata)(
+                self.0,
+                index,
+                userdata.len() as _,
+                userdata.as_ptr() as _,
             )
         }
     }

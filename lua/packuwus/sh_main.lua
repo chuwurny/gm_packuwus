@@ -1,19 +1,7 @@
 AddCSLuaFile()
 
 PackUwUs = PackUwUs or {}
-PackUwUs.PACKED_TEMP_PATH = "packuwus/packed.dat"
-PackUwUs.packuwus_packed_path = CreateConVar("packuwus_packed_path", "", FCVAR_REPLICATED)
-
---[[
-    SERVER:
-    { string fixedPath = string path }
-
-    CLIENT:
-    { string path = string content }
-]]
-PackUwUs.Files = PackUwUs.Files or {}
-
-local files = PackUwUs.Files
+PackUwUs.packuwus_hash = CreateConVar("packuwus_hash", "", FCVAR_REPLICATED)
 
 file.CreateDir("packuwus")
 PackUwUs.LogFileHandle = file.Open("packuwus/log.txt", "w", "DATA")
@@ -127,12 +115,6 @@ function PackUwUs.FixPath(path)
     PackUwUs.Debug("FixPath(\"%s\") did not hit any pattern, returning \"%s\"", path, partPath)
 
     return partPath
-end
-
-function PackUwUs.HasFile(path)
-    local fixedPath = PackUwUs.FixPath(path)
-
-    return files[fixedPath] ~= nil
 end
 
 AddCSLuaFile("packuwus/sh_utils.lua")

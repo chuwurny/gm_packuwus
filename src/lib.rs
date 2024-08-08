@@ -1,13 +1,15 @@
+#![feature(hasher_prefixfree_extras)]
+
 mod module;
 mod packuwus;
 mod sdk;
 
 use gmod::{
     gmod13_close, gmod13_open,
-    lua::{State, LUA_GLOBALSINDEX},
-    lua_function,
+    lua::{LuaReference, State, LUA_GLOBALSINDEX},
+    lua_function, lua_string,
 };
-use hexdump::hexdump;
+use lazy_static::lazy_static;
 use module::Module;
 use packuwus::PackUwUs;
 use procfs::process::Process;
@@ -23,10 +25,10 @@ use sdk::{
 use std::{
     ffi::{c_char, c_int, c_void, CStr, CString},
     mem::transmute,
-    ptr::copy_nonoverlapping,
     slice,
+    sync::{Arc, Mutex},
+    thread::{self},
 };
-use uuid::Uuid;
 
 static_detour! {
     static GMODDATAPACK_ADDORUPDATEFILE: unsafe extern "C" fn(*const c_void, *mut LuaFile, bool);
@@ -35,93 +37,79 @@ static_detour! {
     static CVENGINESERVER_GMOD_SENDTOCLIENTS: unsafe extern "C" fn (*const c_void, *const c_void, *const c_void, i32);
 }
 
-static mut FILESYSTEM: Option<WrappedFileSystem> = None;
-static mut NETWORK_STRING_TABLE_CONTAINTER: Option<
-    WrappedNetworkStringTableContainer,
-> = None;
-static mut CLIENT_FILES_TABLE: Option<WrappedNetworkStringTable> = None;
-static mut DOWNLOADABLES_TABLE: Option<WrappedNetworkStringTable> = None;
 static mut PACKUWUS: Option<PackUwUs> = None;
+static mut CLIENT_FILES_TABLE: Option<WrappedNetworkStringTable> = None;
 
 #[gmod13_open]
 fn gmod13_open(lua: State) -> i32 {
     let this_proc = match Process::myself() {
         Ok(proc) => proc,
-        Err(err) => unsafe {
-            lua.error(format!("Failed to get myself process: {}", err))
-        },
+        Err(err) => unsafe { lua.error(format!("Failed to get myself process: {}", err)) },
     };
 
     let server_srv = match Module::from_process(&this_proc, "server_srv.so") {
         Ok(server_srv) => server_srv,
-        Err(err) => unsafe {
-            lua.error(format!("Failed to get server_srv.so: {}", err))
-        },
+        Err(err) => unsafe { lua.error(format!("Failed to get server_srv.so: {}", err)) },
     };
 
     let engine_srv = match Module::from_process(&this_proc, "engine_srv.so") {
         Ok(engine_srv) => engine_srv,
-        Err(err) => unsafe {
-            lua.error(format!("Failed to get engine_srv.so: {}", err))
-        },
+        Err(err) => unsafe { lua.error(format!("Failed to get engine_srv.so: {}", err)) },
     };
 
-    unsafe {
-        NETWORK_STRING_TABLE_CONTAINTER = match engine_srv
-            .interface::<NetworkStringTableContainer>(
-            "VEngineServerStringTable001",
-        ) {
+    let network_string_table_container = unsafe {
+        match engine_srv.interface::<NetworkStringTableContainer>("VEngineServerStringTable001") {
             Ok(ptr) => Some(WrappedNetworkStringTableContainer(ptr)),
             Err(err) => lua.error(format!(
                 "Failed to get VEngineServerStringTable001: {}",
                 err
             )),
-        };
+        }
+    };
 
-        CLIENT_FILES_TABLE = match NETWORK_STRING_TABLE_CONTAINTER
+    let client_lua_files = unsafe {
+        match network_string_table_container
             .as_ref()
             .unwrap()
             .find_table("client_lua_files")
             .unwrap()
         {
-            Some(tbl) => Some(tbl),
-            None => lua.error(
-                "Failed to find \"client_lua_files\" network string table",
-            ),
-        };
-
-        DOWNLOADABLES_TABLE = match NETWORK_STRING_TABLE_CONTAINTER
-            .as_ref()
-            .unwrap()
-            .find_table("downloadables")
-            .unwrap()
-        {
-            Some(tbl) => Some(tbl),
-            None => lua
-                .error("Failed to find \"downloadables\" network string table"),
-        };
-    }
+            Some(tbl) => tbl,
+            None => lua.error("Failed to find \"client_lua_files\" network string table"),
+        }
+    };
 
     unsafe {
-        FILESYSTEM = match server_srv.symbol("g_pFullFileSystem") {
-            Ok(sym) => Some(WrappedFileSystem(*(sym as *const *const _))),
-            Err(err) => {
-                lua.error(format!("Failed to get g_pFullFileSystem: {}", err))
-            }
-        }
+        CLIENT_FILES_TABLE = Some(client_lua_files);
     }
 
-    let gmoddatapack_addorupdatefile = match server_srv
-        .symbol("_ZN12GModDataPack15AddOrUpdateFileEP7LuaFileb")
+    let downloadables = match network_string_table_container
+        .as_ref()
+        .unwrap()
+        .find_table("downloadables")
+        .unwrap()
     {
-        Ok(sym) => sym,
-        Err(err) => unsafe {
-            lua.error(format!(
-                "Failed to get GModDataPack::AddOrUpdateFile: {}",
-                err
-            ))
-        },
+        Some(tbl) => tbl,
+        None => unsafe { lua.error("Failed to find \"downloadables\" network string table") },
     };
+
+    let fs = unsafe {
+        match server_srv.symbol("g_pFullFileSystem") {
+            Ok(sym) => WrappedFileSystem(*(sym as *const *const _)),
+            Err(err) => lua.error(format!("Failed to get g_pFullFileSystem: {}", err)),
+        }
+    };
+
+    let gmoddatapack_addorupdatefile =
+        match server_srv.symbol("_ZN12GModDataPack15AddOrUpdateFileEP7LuaFileb") {
+            Ok(sym) => sym,
+            Err(err) => unsafe {
+                lua.error(format!(
+                    "Failed to get GModDataPack::AddOrUpdateFile: {}",
+                    err
+                ))
+            },
+        };
 
     unsafe {
         if let Err(err) = GMODDATAPACK_ADDORUPDATEFILE.initialize(
@@ -142,17 +130,16 @@ fn gmod13_open(lua: State) -> i32 {
         }
     }
 
-    let garrysmod_autorefresh_handlechange_lua = match server_srv
-        .symbol("_ZN9GarrysMod11AutoRefresh16HandleChange_LuaERKSsS2_S2_")
-    {
-        Ok(sym) => sym,
-        Err(err) => unsafe {
-            lua.error(format!(
-                "Failed to get GarrysMod::AutoRefresh::HandleChange_Lua: {}",
-                err
-            ))
-        },
-    };
+    let garrysmod_autorefresh_handlechange_lua =
+        match server_srv.symbol("_ZN9GarrysMod11AutoRefresh16HandleChange_LuaERKSsS2_S2_") {
+            Ok(sym) => sym,
+            Err(err) => unsafe {
+                lua.error(format!(
+                    "Failed to get GarrysMod::AutoRefresh::HandleChange_Lua: {}",
+                    err
+                ))
+            },
+        };
 
     unsafe {
         if let Err(err) = GARRYSMOD_AUTOREFRESH_HANDLECHANGE_LUA.initialize(
@@ -173,17 +160,16 @@ fn gmod13_open(lua: State) -> i32 {
         }
     }
 
-    let cvengineserver_gmod_sendtoclients = match engine_srv
-        .symbol("_ZN14CVEngineServer17GMOD_SendToClientEP16IRecipientFilterPvi")
-    {
-        Ok(sym) => sym,
-        Err(err) => unsafe {
-            lua.error(format!(
-                "Failed to get CVEngineServer::GMOD_SendToClient (all clients): {}",
-                err
-            ))
-        },
-    };
+    let cvengineserver_gmod_sendtoclients =
+        match engine_srv.symbol("_ZN14CVEngineServer17GMOD_SendToClientEP16IRecipientFilterPvi") {
+            Ok(sym) => sym,
+            Err(err) => unsafe {
+                lua.error(format!(
+                    "Failed to get CVEngineServer::GMOD_SendToClient (all clients): {}",
+                    err
+                ))
+            },
+        };
 
     unsafe {
         if let Err(err) = CVENGINESERVER_GMOD_SENDTOCLIENTS.initialize(
@@ -204,17 +190,16 @@ fn gmod13_open(lua: State) -> i32 {
         }
     }
 
-    let cvengineserver_gmod_sendtoclient = match engine_srv
-        .symbol("_ZN14CVEngineServer17GMOD_SendToClientEiPvi")
-    {
-        Ok(sym) => sym,
-        Err(err) => unsafe {
-            lua.error(format!(
-                "Failed to get CVEngineServer::GMOD_SendToClient: {}",
-                err
-            ))
-        },
-    };
+    let cvengineserver_gmod_sendtoclient =
+        match engine_srv.symbol("_ZN14CVEngineServer17GMOD_SendToClientEiPvi") {
+            Ok(sym) => sym,
+            Err(err) => unsafe {
+                lua.error(format!(
+                    "Failed to get CVEngineServer::GMOD_SendToClient: {}",
+                    err
+                ))
+            },
+        };
 
     unsafe {
         if let Err(err) = CVENGINESERVER_GMOD_SENDTOCLIENT.initialize(
@@ -235,11 +220,14 @@ fn gmod13_open(lua: State) -> i32 {
         }
     }
 
-    unsafe { PACKUWUS = Some(PackUwUs::new(lua)) }
+    unsafe { PACKUWUS = Some(PackUwUs::new(lua, fs, downloadables, client_lua_files)) }
 
     unsafe {
-        lua.push_function(serve_file);
-        lua.set_field(LUA_GLOBALSINDEX, b"PackUwUs_ServeFile\0".as_ptr() as _);
+        lua.push_function(pack);
+        lua.set_field(LUA_GLOBALSINDEX, lua_string!("PackUwUs_Pack"));
+
+        lua.push_function(set_pack_content);
+        lua.set_field(LUA_GLOBALSINDEX, lua_string!("PackUwUs_SetPackContent"));
     }
 
     0
@@ -252,9 +240,7 @@ fn gmod13_close(lua: State) -> i32 {
         println!("Failed to disable GModDataPack::AddOrUpdateFile: {}", err);
     }
 
-    if let Err(err) =
-        unsafe { GARRYSMOD_AUTOREFRESH_HANDLECHANGE_LUA.disable() }
-    {
+    if let Err(err) = unsafe { GARRYSMOD_AUTOREFRESH_HANDLECHANGE_LUA.disable() } {
         println!(
             "Failed to disable GarrysMod::AutoRefresh::HandleChange_Lua: {}",
             err
@@ -269,7 +255,10 @@ fn gmod13_close(lua: State) -> i32 {
     }
 
     if let Err(err) = unsafe { CVENGINESERVER_GMOD_SENDTOCLIENTS.disable() } {
-        println!("Failed to disable CVEngineServer::Gmod_SendToClient (all clients): {}", err);
+        println!(
+            "Failed to disable CVEngineServer::Gmod_SendToClient (all clients): {}",
+            err
+        );
     }
 
     unsafe {
@@ -280,82 +269,206 @@ fn gmod13_close(lua: State) -> i32 {
     0
 }
 
-#[lua_function]
-unsafe fn serve_file(lua: State) -> i32 {
-    let filepath = lua.check_string(1);
+#[derive(PartialEq)]
+enum ServeFileStatus {
+    Idle,
+    Working,
+    Failed((LuaReference, String)),
+    Done((LuaReference, String)),
+}
 
-    if !FILESYSTEM.as_ref().unwrap().exists(
-        CStr::from_ptr(filepath.as_ptr() as _),
-        Some(CStr::from_ptr(b"DATA\0".as_ptr() as _)),
-    ) {
-        lua.error(format!("File \"{}\" doesn't exist in DATA path", filepath))
-    }
+lazy_static! {
+    static ref SERVE_FILE_STATUS: Arc<Mutex<ServeFileStatus>> =
+        Arc::new(Mutex::new(ServeFileStatus::Idle));
+}
 
-    let packed_hash = Uuid::new_v4().simple().to_string();
-    let new_packed_filename = format!("{}.bsp", packed_hash);
-    let new_packed_filepath = format!("serve_packuwus/{}", new_packed_filename);
-    let new_packed_filepath_cstr =
-        CString::new(new_packed_filepath.as_str()).unwrap();
+const LUA_SYNC_THREAD_TIMER_NAME: &str = "PackUwUs lua sync thread";
 
-    #[cfg(debug_assertions)]
-    println!("Moving file from {} to {}", filepath, new_packed_filepath);
+unsafe fn start_sync_thread(lua: State) {
+    println!("[PackUwUs] Starting lua sync thread...");
 
-    if !FILESYSTEM.as_ref().unwrap().rename(
-        CStr::from_ptr(filepath.as_ptr() as _),
-        &new_packed_filepath_cstr,
-        CStr::from_ptr(b"DATA\0".as_ptr() as _),
-    ) {
+    lua.get_global(lua_string!("timer"));
+
+    if lua.is_table(-1) {
+        lua.get_field(-1, lua_string!("Create"));
+
+        if lua.is_function(-1) {
+            lua.push_string(LUA_SYNC_THREAD_TIMER_NAME); // name
+            lua.push_number(0.0); // interval
+            lua.push_number(0.0); // reps
+            lua.push_function(lua_sync_thread); // callback
+
+            if !lua.pcall_ignore(4, 0) {
+                lua.error(format!(
+                    "Failed to setup lua sync thread: _G.timer.Create errored!"
+                ));
+            }
+        } else {
+            lua.pop(); // pop _G.timer.Create
+
+            lua.error(format!(
+                "Failed to setup lua sync thread: _G.timer.Create is not a function (got type {})!",
+                lua.get_type(-1)
+            ));
+        }
+    } else {
         lua.error(format!(
-            "Failed to rename (move) file {} to {}",
-            filepath, new_packed_filepath
+            "Failed to setup lua sync thread: _G.timer is not a table (got type {})!",
+            lua.get_type(-1)
         ));
     }
 
-    let mut downloadable_filepath = None;
+    lua.pop(); // pop _G.timer
+}
 
-    for index in 0..DOWNLOADABLES_TABLE.as_ref().unwrap().num_strings() {
-        let str = DOWNLOADABLES_TABLE.as_ref().unwrap().string(index).unwrap();
+unsafe fn stop_sync_thread(lua: State) {
+    println!("[PackUwUs] Stopping lua sync thread...");
 
-        if str.to_string_lossy().starts_with("data/serve_packuwus/") {
-            downloadable_filepath = Some(str);
+    lua.get_global(lua_string!("timer"));
 
-            break;
+    if lua.is_table(-1) {
+        lua.get_field(-1, lua_string!("Remove"));
+
+        if lua.is_function(-1) {
+            lua.push_string(LUA_SYNC_THREAD_TIMER_NAME); // name
+
+            if !lua.pcall_ignore(1, 0) {
+                lua.error(format!(
+                    "Failed to stop lua sync thread: _G.timer.Remove errored!"
+                ));
+            }
+        } else {
+            lua.pop(); // pop _G.timer.Create
+
+            lua.error(format!(
+                "Failed to stop lua sync thread: _G.timer.Remove is not a function (got type {})!",
+                lua.get_type(-1)
+            ));
+        }
+    } else {
+        lua.error(format!(
+            "Failed to stop lua sync thread: _G.timer is not a table (got type {})!",
+            lua.get_type(-1)
+        ));
+    }
+
+    lua.pop(); // pop _G.timer
+}
+
+#[lua_function]
+unsafe fn pack(lua: State) -> i32 {
+    match SERVE_FILE_STATUS.try_lock() {
+        Ok(ref mut status) => match **status {
+            ServeFileStatus::Working => {
+                lua.push_boolean(false);
+
+                return 1;
+            }
+            ServeFileStatus::Failed((callback_ref, _)) => {
+                lua.dereference(callback_ref);
+            }
+            ServeFileStatus::Done((callback_ref, _)) => {
+                lua.dereference(callback_ref);
+            }
+            _ => (),
+        },
+        Err(_) => {
+            lua.push_boolean(false);
+
+            return 1;
         }
     }
 
-    let new_full_packed_filepath = format!("data/{}", new_packed_filepath);
-    let new_full_packed_filepath_cstr =
-        CString::new(new_full_packed_filepath.as_str()).unwrap();
+    lua.check_function(1);
+    let callback_ref = lua.reference();
 
-    if let Some(downloadable_filepath) = downloadable_filepath {
-        copy_nonoverlapping(
-            new_full_packed_filepath_cstr.as_ptr() as _,
-            downloadable_filepath.as_ptr() as _,
-            new_full_packed_filepath_cstr.as_bytes_with_nul().len(),
-        );
-    } else {
-        let index = DOWNLOADABLES_TABLE
-            .as_ref()
-            .unwrap()
-            .add_string(true, &new_full_packed_filepath_cstr);
+    start_sync_thread(lua);
 
-        #[cfg(debug_assertions)]
-        println!("Added new value to network string table (index: {})", index);
-    }
+    *SERVE_FILE_STATUS.lock().unwrap() = ServeFileStatus::Working;
 
-    #[cfg(debug_assertions)]
-    println!("Serving {}", new_full_packed_filepath);
+    thread::spawn(move || match PACKUWUS.as_mut().unwrap().try_serve() {
+        Ok(packed_hash) => {
+            if let Some(packed_hash) = packed_hash {
+                *SERVE_FILE_STATUS.lock().unwrap() =
+                    ServeFileStatus::Done((callback_ref, packed_hash));
 
-    lua.push_string(packed_hash.as_str());
+                return;
+            }
+        }
+        Err(err) => {
+            *SERVE_FILE_STATUS.lock().unwrap() =
+                ServeFileStatus::Failed((callback_ref, err.to_string()));
+        }
+    });
+
+    lua.push_boolean(true);
 
     1
 }
 
-fn new_gmoddatapack_addorupdatefile(
-    this: *const c_void,
-    file: *mut LuaFile,
-    reload: bool,
-) {
+#[lua_function]
+unsafe fn lua_sync_thread(lua: State) -> i32 {
+    #[cfg(debug_assertions)]
+    println!("lua_sync_thread");
+
+    match SERVE_FILE_STATUS.try_lock() {
+        Ok(ref mut status) => {
+            match **status {
+                ServeFileStatus::Failed((callback_ref, ref err)) => {
+                    println!("[PackUwUs] Serve file failed: {}", err);
+
+                    lua.from_reference(callback_ref);
+
+                    lua.push_string(err.as_str());
+                    lua.push_nil();
+
+                    if !lua.pcall_ignore(2, 0) {
+                        println!("[PackUwUs] Error in lua sync thread: PackUwUs_TryServe callback errored!");
+                    }
+
+                    lua.dereference(callback_ref);
+
+                    **status = ServeFileStatus::Idle;
+
+                    stop_sync_thread(lua);
+                }
+                ServeFileStatus::Done((callback_ref, ref hash)) => {
+                    println!("[PackUwUs] Serve file done! Hash: {}", hash);
+
+                    lua.from_reference(callback_ref);
+
+                    lua.push_nil();
+                    lua.push_string(hash.as_str());
+
+                    if !lua.pcall_ignore(2, 0) {
+                        println!("[PackUwUs] Error in lua sync thread: PackUwUs_TryServe callback errored!");
+                    }
+
+                    lua.dereference(callback_ref);
+
+                    **status = ServeFileStatus::Idle;
+
+                    stop_sync_thread(lua);
+                }
+                _ => (),
+            }
+        }
+        Err(_) => (),
+    }
+
+    0
+}
+
+#[lua_function]
+unsafe fn set_pack_content(lua: State) -> i32 {
+    println!("[PackUwUs] Setting pack content");
+
+    PACKUWUS.as_mut().unwrap().packed_contents = Some(lua.check_string(1).to_string());
+
+    0
+}
+
+fn new_gmoddatapack_addorupdatefile(this: *const c_void, file: *mut LuaFile, reload: bool) {
     #[cfg(debug_assertions)]
     println!(
         "GModDataPack::AddOrUpdateFile({:?}, {:?} ({}), {})",
@@ -368,11 +481,30 @@ fn new_gmoddatapack_addorupdatefile(
     );
 
     unsafe {
-        if let Err(err) = PACKUWUS.as_ref().unwrap().notify_client_file(
-            (*file).name.as_c_str().to_str().unwrap(),
-            reload,
-        ) {
-            println!("Failed to notify client file: {}", err);
+        let path = (*file).name.as_c_str().to_str().unwrap();
+
+        match PACKUWUS
+            .as_ref()
+            .unwrap()
+            .handle_pack(path, &(*file).content.as_c_str().to_string_lossy())
+        {
+            Ok((should_pack, new_content)) => {
+                if should_pack {
+                    if reload {
+                        if let Err(err) = PACKUWUS.as_mut().unwrap().edit_file(
+                            path,
+                            new_content.unwrap_or_else(|| (*file).content.to_string()),
+                        ) {
+                            println!("[PackUwUs] Failed to edit file {}", err);
+                        }
+                    } else {
+                        if let Err(err) = PACKUWUS.as_mut().unwrap().add_file(path, new_content) {
+                            println!("[PackUwUs] Failed to add file: {}", err);
+                        }
+                    }
+                }
+            }
+            Err(err) => println!("[PackUwUs] Failed to notify client file: {}", err),
         }
     }
 
@@ -397,10 +529,7 @@ fn new_garrysmod_autorefresh_handlechange_lua(
         dbg!(CStr::from_ptr(*file_ext).to_string_lossy());
     }
 
-    unsafe {
-        GARRYSMOD_AUTOREFRESH_HANDLECHANGE_LUA
-            .call(directory, filename, file_ext)
-    }
+    unsafe { GARRYSMOD_AUTOREFRESH_HANDLECHANGE_LUA.call(directory, filename, file_ext) }
 }
 
 fn new_cvengineserver_gmod_sendtoclient(
@@ -415,45 +544,30 @@ fn new_cvengineserver_gmod_sendtoclient(
         this, client_id, data, data_len
     );
 
-    /*
-    unsafe {
-        dbg!(LUASHARED.as_ref().unwrap().cache("lua/includes/init.lua"));
-        dbg!(LUASHARED.as_ref().unwrap().cache("includes/init.lua"));
-    }
-    */
-
-    unsafe fn try_get_new_lua_code(
+    unsafe fn build_download_packet(
         file_id: u16,
-        compressed_lzma_code: &[u8],
-    ) -> Result<Option<String>, Box<dyn std::error::Error>> {
-        let filepath = CLIENT_FILES_TABLE
-            .as_ref()
-            .unwrap()
-            .string(file_id as _)
-            .ok_or_else(|| {
-                format!("Failed to find filepath by file_id: {}", file_id)
-            })?
-            .to_str()?;
-
-        if !PACKUWUS.as_ref().unwrap().should_pack(filepath, false)? {
+    ) -> Result<Option<Vec<u8>>, Box<dyn std::error::Error>> {
+        if !PACKUWUS.as_ref().unwrap().is_packed(
+            CLIENT_FILES_TABLE
+                .as_ref()
+                .unwrap()
+                .string(file_id as _)
+                .ok_or_else(|| format!("Failed to find filepath by file_id: {}", file_id))?
+                .to_str()?,
+        ) {
             return Ok(None);
         }
 
-        let original_lua_code = CString::from_vec_with_nul(
-            gmod_lzma::decompress(compressed_lzma_code).or_else(
-                |lzma_errnum| {
-                    Err(format!(
-                        "Failed to decompress: status code is {}",
-                        lzma_errnum
-                    ))
-                },
-            )?,
-        )?;
-
-        Ok(PACKUWUS
-            .as_ref()
-            .unwrap()
-            .modify_content(filepath, original_lua_code.to_str()?)?)
+        Ok(Some(PackUwUs::build_lua_download_packet(
+            file_id,
+            PACKUWUS
+                .as_ref()
+                .unwrap()
+                .packed_contents
+                .as_ref()
+                .ok_or("You forgot to set pack content using PackUwUs_SetPackContent function!")?
+                .as_str(),
+        )?))
     }
 
     unsafe {
@@ -463,49 +577,42 @@ fn new_cvengineserver_gmod_sendtoclient(
             // 0x03 (sz: 0x20) file content hash
             // 0x23 (sz: *)    LZMA file content
 
-            let file_id =
-                (data as *const u16).byte_offset(0x01).read_unaligned();
+            let file_id = (data as *const u16).byte_offset(0x01).read_unaligned();
 
-            let lzma_file_content = slice::from_raw_parts(
-                (data as *const u8).byte_offset(0x23),
-                ((data_len / 8) - 0x23) as _,
-            );
+            match build_download_packet(file_id) {
+                Ok(packet) => {
+                    if let Some(packet) = packet {
+                        #[cfg(debug_assertions)]
+                        println!(
+                            "[PackUwUs] Sending client {} packed file {}",
+                            client_id, file_id
+                        );
 
-            match try_get_new_lua_code(file_id, lzma_file_content) {
-                Ok(new_code) => {
-                    if let Some(new_lua_code) = new_code {
-                        match PackUwUs::build_lua_download_packet(
-                            file_id,
-                            new_lua_code.as_str(),
-                        ) {
-                            Ok(packet) => {
-                                #[cfg(debug_assertions)]
-                                println!("Packing {}", file_id);
-
-                                return CVENGINESERVER_GMOD_SENDTOCLIENT.call(
-                                    this,
-                                    client_id,
-                                    packet.as_ptr() as _,
-                                    (packet.len() * 8) as _,
-                                );
-                            }
-                            Err(err) => println!(
-                                "Failed to build lua download packet: {}",
-                                err
-                            ),
-                        }
+                        return CVENGINESERVER_GMOD_SENDTOCLIENT.call(
+                            this,
+                            client_id,
+                            packet.as_ptr() as _,
+                            (packet.len() * 8) as _,
+                        );
                     }
+
+                    #[cfg(debug_assertions)]
+                    println!(
+                        "[PackUwUs] File {} is not packed, sending original content to client {}",
+                        file_id, client_id
+                    );
                 }
                 Err(err) => {
-                    println!("Error occured in try_get_new_lua_code: {}", err)
+                    println!(
+                        "[PackUwUs] Error occured while building download packet: {}",
+                        err
+                    )
                 }
             }
         }
     }
 
-    unsafe {
-        CVENGINESERVER_GMOD_SENDTOCLIENT.call(this, client_id, data, data_len)
-    }
+    unsafe { CVENGINESERVER_GMOD_SENDTOCLIENT.call(this, client_id, data, data_len) }
 }
 
 fn new_cvengineserver_gmod_sendtoclients(
@@ -526,25 +633,38 @@ fn new_cvengineserver_gmod_sendtoclients(
     ) -> Result<Option<String>, Box<dyn std::error::Error>> {
         let filepath = filepath.to_str()?;
 
-        if !PACKUWUS.as_ref().unwrap().should_pack(filepath, true)? {
-            return Ok(None);
-        }
-
         let original_lua_code = CString::from_vec_with_nul(
-            gmod_lzma::decompress(compressed_lzma_code).or_else(
-                |lzma_errnum| {
-                    Err(format!(
-                        "Failed to decompress: status code is {}",
-                        lzma_errnum
-                    ))
-                },
-            )?,
+            gmod_lzma::decompress(compressed_lzma_code).or_else(|lzma_errnum| {
+                Err(format!(
+                    "Failed to decompress: status code is {}",
+                    lzma_errnum
+                ))
+            })?,
         )?;
 
-        Ok(PACKUWUS
+        let (should_pack, new_code) = PACKUWUS
             .as_ref()
             .unwrap()
-            .modify_content(filepath, original_lua_code.to_str()?)?)
+            .handle_pack(filepath, &original_lua_code.to_string_lossy())?;
+
+        let has_new_code = new_code.is_some();
+
+        let code_to_save =
+            new_code.unwrap_or_else(|| original_lua_code.to_string_lossy().to_string());
+
+        if let Err(err) = PACKUWUS
+            .as_mut()
+            .unwrap()
+            .edit_file(filepath, code_to_save.clone())
+        {
+            println!("[PackUwUs] packUwUs edit file failed: {}", err);
+        }
+
+        if should_pack && has_new_code {
+            return Ok(Some(code_to_save));
+        }
+
+        Ok(None)
     }
 
     unsafe {
@@ -569,9 +689,7 @@ fn new_cvengineserver_gmod_sendtoclients(
 
             let compressed_lzma_code = slice::from_raw_parts(
                 compressed_lzma_code,
-                (((data_len / 8) as usize)
-                    - 1
-                    - filepath.to_bytes_with_nul().len()) as _,
+                (((data_len / 8) as usize) - 1 - filepath.to_bytes_with_nul().len()) as _,
             );
 
             match try_get_new_lua_code(filepath, compressed_lzma_code) {
@@ -583,10 +701,7 @@ fn new_cvengineserver_gmod_sendtoclients(
                         ) {
                             Ok(packet) => {
                                 #[cfg(debug_assertions)]
-                                println!(
-                                    "Packing {}",
-                                    filepath.to_string_lossy()
-                                );
+                                println!("[PackUwUs] Auto-refresh {}", filepath.to_string_lossy());
 
                                 return CVENGINESERVER_GMOD_SENDTOCLIENTS.call(
                                     this,
@@ -595,10 +710,9 @@ fn new_cvengineserver_gmod_sendtoclients(
                                     (packet.len() * 8) as _,
                                 );
                             }
-                            Err(err) => println!(
-                                "Failed to build autorefresh packet: {}",
-                                err
-                            ),
+                            Err(err) => {
+                                println!("[PackUwUs] Failed to build autorefresh packet: {}", err)
+                            }
                         }
                     }
                 }
@@ -609,7 +723,5 @@ fn new_cvengineserver_gmod_sendtoclients(
         }
     }
 
-    unsafe {
-        CVENGINESERVER_GMOD_SENDTOCLIENTS.call(this, filter, data, data_len)
-    }
+    unsafe { CVENGINESERVER_GMOD_SENDTOCLIENTS.call(this, filter, data, data_len) }
 }
