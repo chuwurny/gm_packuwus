@@ -1,5 +1,5 @@
 concommand.Add("packuwus_repack", function(ply)
     if IsValid(ply) then return end
 
-    PackUwUs.MarkToRepack()
+    PackUwUs.Pack()
 end)
