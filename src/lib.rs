@@ -380,9 +380,10 @@ unsafe fn pack(lua: State) -> i32 {
     }
 
     lua.check_function(1);
-    let callback_ref = lua.reference();
 
     start_sync_thread(lua);
+
+    let callback_ref = lua.reference();
 
     *SERVE_FILE_STATUS.lock().unwrap() = ServeFileStatus::Working;
 
