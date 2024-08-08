@@ -1,7 +1,6 @@
 use std::{
     ffi::{c_char, c_int, c_uint, c_void, CStr},
     ptr::null,
-    string::FromUtf8Error,
 };
 
 pub type FileHandle = *const c_void;

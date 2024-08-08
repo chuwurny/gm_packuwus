@@ -1,7 +1,7 @@
 use std::{
     collections::HashMap,
-    ffi::{CStr, CString, NulError},
-    io::{Read, Write},
+    ffi::{CString, NulError},
+    io::Write,
     mem::size_of,
     ptr::copy_nonoverlapping,
     string::FromUtf8Error,
