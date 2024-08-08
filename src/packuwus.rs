@@ -69,6 +69,8 @@ pub enum EditFileError {
 pub enum TryServeError {
     #[error("Failed to write packed file: {0}")]
     WriteFileFailed(WriteFileError),
+    #[error("Packed contents is not set. Forgot to set it using PackUwUs_SetPackContent?")]
+    PackedContentsNotSet,
 }
 
 #[derive(Debug)]
@@ -241,13 +243,21 @@ impl PackUwUs {
             let filepath = self.client_lua_files.string(index);
 
             if let Some(filepath) = filepath {
-                if let Some(packed_file) = self.files.get(&filepath.to_string_lossy().to_string()) {
+                if self
+                    .files
+                    .contains_key(&filepath.to_string_lossy().to_string())
+                {
                     let mut hash = Sha256::new();
 
                     hash.update(
-                        CString::new(packed_file.content.as_str())
-                            .unwrap()
-                            .as_bytes_with_nul(),
+                        CString::new(
+                            self.packed_contents
+                                .as_ref()
+                                .ok_or_else(|| TryServeError::PackedContentsNotSet)?
+                                .as_str(),
+                        )
+                        .unwrap()
+                        .as_bytes_with_nul(),
                     );
 
                     let hash = hash.finalize();
