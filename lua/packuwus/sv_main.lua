@@ -89,7 +89,7 @@ function PackUwUs.PackAsync()
         if PackUwUs.NeedToRepack then
             warn("NeedToRepack is set while packing, repacking...")
 
-            PackUwUs.Pack()
+            PackUwUs.PackAsync()
         end
     end)
 
