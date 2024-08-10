@@ -75,7 +75,7 @@ function PackUwUs.PackAsync()
 
     local startTime = SysTime()
 
-    local packStarted = PackUwUs_Pack(function(packErr, hash)
+    local packStarted = PackUwUs_PackAsync(function(packErr, hash)
         PackUwUs.Packing = false
 
         if packErr then
