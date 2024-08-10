@@ -223,8 +223,11 @@ fn gmod13_open(lua: State) -> i32 {
     unsafe { PACKUWUS = Some(PackUwUs::new(lua, fs, downloadables, client_lua_files)) }
 
     unsafe {
-        lua.push_function(pack);
-        lua.set_field(LUA_GLOBALSINDEX, lua_string!("PackUwUs_Pack"));
+        lua.push_function(pack_sync);
+        lua.set_field(LUA_GLOBALSINDEX, lua_string!("PackUwUs_PackSync"));
+
+        lua.push_function(pack_async);
+        lua.set_field(LUA_GLOBALSINDEX, lua_string!("PackUwUs_PackAsync"));
 
         lua.push_function(set_pack_content);
         lua.set_field(LUA_GLOBALSINDEX, lua_string!("PackUwUs_SetPackContent"));
@@ -277,6 +280,24 @@ fn gmod13_close(lua: State) -> i32 {
     }
 
     0
+}
+
+#[lua_function]
+unsafe fn pack_sync(lua: State) -> i32 {
+    match PACKUWUS.as_mut().unwrap().try_serve() {
+        Ok(hash) => {
+            if let Some(hash) = hash {
+                lua.push_boolean(true);
+                lua.push_string(hash.as_str());
+            }
+        }
+        Err(err) => lua.error(format!("Failed to pack: {}", err)),
+    };
+
+    lua.push_boolean(false);
+    lua.push_nil();
+
+    2
 }
 
 #[derive(PartialEq)]
@@ -366,7 +387,7 @@ unsafe fn stop_sync_thread(lua: State) {
 }
 
 #[lua_function]
-unsafe fn pack(lua: State) -> i32 {
+unsafe fn pack_async(lua: State) -> i32 {
     match SERVE_FILE_STATUS.try_lock() {
         Ok(ref mut status) => match **status {
             ServeFileStatus::Working => {

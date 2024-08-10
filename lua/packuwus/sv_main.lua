@@ -6,6 +6,7 @@ local log = PackUwUs.Log
 local warn = PackUwUs.Warn
 local ok = PackUwUs.Ok
 local err = PackUwUs.Error
+local dbg = PackUwUs.Debug
 
 function PackUwUs.ShouldPack(path)
     path = PackUwUs.FixPath(path)
@@ -36,9 +37,38 @@ function PackUwUs.ShouldPack(path)
     return true
 end
 
-function PackUwUs.Pack()
+function PackUwUs.PackSync()
     if PackUwUs.Packing then
         PackUwUs.NeedToRepack = true
+
+        dbg("NeedToRepack set to true")
+
+        return
+    end
+
+    local startTime = SysTime()
+
+    log("Packing UwUs...")
+    dbg("Packing synchronously")
+
+    local success, result = PackUwUs_PackSync()
+
+    if not success then
+        err("Error occured while packing: %s", packErr)
+    elseif result == false then
+        ok("Nothing to pack!")
+    else
+        ok("Pack complete in %.2f seconds! Hash is %s", SysTime() - startTime, result)
+
+        PackUwUs.packuwus_hash:SetString(result)
+    end
+end
+
+function PackUwUs.PackAsync()
+    if PackUwUs.Packing then
+        PackUwUs.NeedToRepack = true
+
+        dbg("NeedToRepack set to true")
 
         return
     end
@@ -65,6 +95,7 @@ function PackUwUs.Pack()
 
     if packStarted then
         log("Packing UwUs...")
+        dbg("Packing asynchronously")
 
         PackUwUs.NeedToRepack = false
         PackUwUs.Packing = true

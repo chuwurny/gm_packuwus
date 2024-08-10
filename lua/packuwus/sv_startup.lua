@@ -6,15 +6,15 @@ if not PackUwUs.Ready then
 
         PackUwUs.Ready = true
 
-        PackUwUs.Pack()
+        PackUwUs.PackSync()
         PackUwUs_SetPackContent("return unpackMeUwU()()")
 
-        timer.Create("PackUwUs auto repack", 1, 0, PackUwUs.Pack)
+        timer.Create("PackUwUs auto repack", 1, 0, PackUwUs.PackAsync)
     end)
 
     PackUwUs.Log("Loading internal module...")
     require("packuwus")
     PackUwUs.Ok("Internal module loaded!")
 else
-    PackUwUs.Pack()
+    PackUwUs.PackAsync()
 end
