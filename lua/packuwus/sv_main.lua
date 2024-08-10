@@ -51,7 +51,7 @@ function PackUwUs.PackSync()
     log("Packing UwUs...")
     dbg("Packing synchronously")
 
-    local success, result = PackUwUs_PackSync()
+    local success, result = pcall(PackUwUs_PackSync)
 
     if not success then
         err("Error occured while packing: %s", packErr)
