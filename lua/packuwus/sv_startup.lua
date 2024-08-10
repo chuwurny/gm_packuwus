@@ -9,7 +9,9 @@ if not PackUwUs.Ready then
         PackUwUs.PackSync()
         PackUwUs_SetPackContent("return unpackMeUwU()()")
 
-        timer.Create("PackUwUs auto repack", 1, 0, PackUwUs.PackAsync)
+        timer.Create("PackUwUs auto repack", 1, 0, function()
+            PackUwUs.PackAsync(true)
+        end)
     end)
 
     PackUwUs.Log("Loading internal module...")

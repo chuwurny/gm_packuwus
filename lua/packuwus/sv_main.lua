@@ -37,11 +37,13 @@ function PackUwUs.ShouldPack(path)
     return true
 end
 
-function PackUwUs.PackSync()
+function PackUwUs.PackSync(onlyCheck)
     if PackUwUs.Packing then
-        PackUwUs.NeedToRepack = true
+        if onlyCheck ~= true then
+            PackUwUs.NeedToRepack = true
 
-        dbg("NeedToRepack set to true")
+            dbg("NeedToRepack set to true")
+        end
 
         return
     end
@@ -64,11 +66,13 @@ function PackUwUs.PackSync()
     end
 end
 
-function PackUwUs.PackAsync()
+function PackUwUs.PackAsync(onlyCheck)
     if PackUwUs.Packing then
-        PackUwUs.NeedToRepack = true
+        if onlyCheck ~= true then
+            PackUwUs.NeedToRepack = true
 
-        dbg("NeedToRepack set to true")
+            dbg("NeedToRepack set to true")
+        end
 
         return
     end
