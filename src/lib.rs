@@ -237,7 +237,10 @@ fn gmod13_open(lua: State) -> i32 {
 #[gmod13_close]
 fn gmod13_close(lua: State) -> i32 {
     if let Err(err) = unsafe { GMODDATAPACK_ADDORUPDATEFILE.disable() } {
-        println!("[PackUwUs] Failed to disable GModDataPack::AddOrUpdateFile: {}", err);
+        println!(
+            "[PackUwUs] Failed to disable GModDataPack::AddOrUpdateFile: {}",
+            err
+        );
     }
 
     if let Err(err) = unsafe { GARRYSMOD_AUTOREFRESH_HANDLECHANGE_LUA.disable() } {
@@ -428,47 +431,49 @@ unsafe fn lua_sync_thread(lua: State) -> i32 {
     println!("lua_sync_thread");
 
     match SERVE_FILE_STATUS.try_lock() {
-        Ok(ref mut status) => {
-            match **status {
-                ServeFileStatus::Failed((callback_ref, ref err)) => {
-                    println!("[PackUwUs] Serve file failed: {}", err);
+        Ok(ref mut status) => match **status {
+            ServeFileStatus::Failed((callback_ref, ref err)) => {
+                println!("[PackUwUs] Serve file failed: {}", err);
 
-                    lua.from_reference(callback_ref);
+                lua.from_reference(callback_ref);
 
-                    lua.push_string(err.as_str());
-                    lua.push_nil();
+                lua.push_string(err.as_str());
+                lua.push_nil();
 
-                    if !lua.pcall_ignore(2, 0) {
-                        println!("[PackUwUs] Error in lua sync thread: PackUwUs_Pack callback errored!");
-                    }
-
-                    lua.dereference(callback_ref);
-
-                    **status = ServeFileStatus::Idle;
-
-                    stop_sync_thread(lua);
+                if !lua.pcall_ignore(2, 0) {
+                    println!(
+                        "[PackUwUs] Error in lua sync thread: PackUwUs_Pack callback errored!"
+                    );
                 }
-                ServeFileStatus::Done((callback_ref, ref hash)) => {
-                    println!("[PackUwUs] Serve file done! Hash: {}", hash);
 
-                    lua.from_reference(callback_ref);
+                lua.dereference(callback_ref);
 
-                    lua.push_nil();
-                    lua.push_string(hash.as_str());
+                **status = ServeFileStatus::Idle;
 
-                    if !lua.pcall_ignore(2, 0) {
-                        println!("[PackUwUs] Error in lua sync thread: PackUwUs_Pack callback errored!");
-                    }
-
-                    lua.dereference(callback_ref);
-
-                    **status = ServeFileStatus::Idle;
-
-                    stop_sync_thread(lua);
-                }
-                _ => (),
+                stop_sync_thread(lua);
             }
-        }
+            ServeFileStatus::Done((callback_ref, ref hash)) => {
+                println!("[PackUwUs] Serve file done! Hash: {}", hash);
+
+                lua.from_reference(callback_ref);
+
+                lua.push_nil();
+                lua.push_string(hash.as_str());
+
+                if !lua.pcall_ignore(2, 0) {
+                    println!(
+                        "[PackUwUs] Error in lua sync thread: PackUwUs_Pack callback errored!"
+                    );
+                }
+
+                lua.dereference(callback_ref);
+
+                **status = ServeFileStatus::Idle;
+
+                stop_sync_thread(lua);
+            }
+            _ => (),
+        },
         Err(_) => (),
     }
 
