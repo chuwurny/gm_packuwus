@@ -237,26 +237,26 @@ fn gmod13_open(lua: State) -> i32 {
 #[gmod13_close]
 fn gmod13_close(lua: State) -> i32 {
     if let Err(err) = unsafe { GMODDATAPACK_ADDORUPDATEFILE.disable() } {
-        println!("Failed to disable GModDataPack::AddOrUpdateFile: {}", err);
+        println!("[PackUwUs] Failed to disable GModDataPack::AddOrUpdateFile: {}", err);
     }
 
     if let Err(err) = unsafe { GARRYSMOD_AUTOREFRESH_HANDLECHANGE_LUA.disable() } {
         println!(
-            "Failed to disable GarrysMod::AutoRefresh::HandleChange_Lua: {}",
+            "[PackUwUs] Failed to disable GarrysMod::AutoRefresh::HandleChange_Lua: {}",
             err
         );
     }
 
     if let Err(err) = unsafe { CVENGINESERVER_GMOD_SENDTOCLIENT.disable() } {
         println!(
-            "Failed to disable CVEngineServer::Gmod_SendToClient: {}",
+            "[PackUwUs] Failed to disable CVEngineServer::Gmod_SendToClient: {}",
             err
         );
     }
 
     if let Err(err) = unsafe { CVENGINESERVER_GMOD_SENDTOCLIENTS.disable() } {
         println!(
-            "Failed to disable CVEngineServer::Gmod_SendToClient (all clients): {}",
+            "[PackUwUs] Failed to disable CVEngineServer::Gmod_SendToClient (all clients): {}",
             err
         );
     }
@@ -439,7 +439,7 @@ unsafe fn lua_sync_thread(lua: State) -> i32 {
                     lua.push_nil();
 
                     if !lua.pcall_ignore(2, 0) {
-                        println!("[PackUwUs] Error in lua sync thread: PackUwUs_TryServe callback errored!");
+                        println!("[PackUwUs] Error in lua sync thread: PackUwUs_Pack callback errored!");
                     }
 
                     lua.dereference(callback_ref);
@@ -457,7 +457,7 @@ unsafe fn lua_sync_thread(lua: State) -> i32 {
                     lua.push_string(hash.as_str());
 
                     if !lua.pcall_ignore(2, 0) {
-                        println!("[PackUwUs] Error in lua sync thread: PackUwUs_TryServe callback errored!");
+                        println!("[PackUwUs] Error in lua sync thread: PackUwUs_Pack callback errored!");
                     }
 
                     lua.dereference(callback_ref);
