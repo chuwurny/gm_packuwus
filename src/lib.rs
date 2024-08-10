@@ -261,9 +261,16 @@ fn gmod13_close(lua: State) -> i32 {
         );
     }
 
+    // TODO: there's no module unload support, so these lines are useless i guess?
+    //                                            ~~~~~~~~~~~
+    //                                                 |
+    // \/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/
     unsafe {
         lua.push_nil();
-        lua.set_field(LUA_GLOBALSINDEX, b"PackUwUs_ServeFile\0".as_ptr() as _);
+        lua.set_field(LUA_GLOBALSINDEX, b"PackUwUs_Pack\0".as_ptr() as _);
+
+        lua.push_nil();
+        lua.set_field(LUA_GLOBALSINDEX, b"PackUwUs_SetPackContent\0".as_ptr() as _);
     }
 
     0
