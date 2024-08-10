@@ -8,6 +8,8 @@ if not PackUwUs.Ready then
 
         PackUwUs.Pack()
         PackUwUs_SetPackContent("return unpackMeUwU()()")
+
+        timer.Create("PackUwUs auto repack", 1, 0, PackUwUs.Pack)
     end)
 
     PackUwUs.Log("Loading internal module...")
