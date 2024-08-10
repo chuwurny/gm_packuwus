@@ -45,12 +45,7 @@ function PackUwUs.Pack()
 
     local startTime = SysTime()
 
-    log("Packing UwUs...")
-
-    PackUwUs.NeedToRepack = false
-    PackUwUs.Packing = true
-
-    PackUwUs_Pack(function(packErr, hash)
+    local packStarted = PackUwUs_Pack(function(packErr, hash)
         PackUwUs.Packing = false
 
         if packErr then
@@ -67,4 +62,11 @@ function PackUwUs.Pack()
             PackUwUs.Pack()
         end
     end)
+
+    if packStarted then
+        log("Packing UwUs...")
+
+        PackUwUs.NeedToRepack = false
+        PackUwUs.Packing = true
+    end
 end
