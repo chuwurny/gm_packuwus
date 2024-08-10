@@ -307,6 +307,8 @@ impl PackUwUs {
             );
         }
 
+        self.content_changed = false;
+
         println!("[PackUwUs] Internal pack done!");
 
         Ok(Some(hash))
