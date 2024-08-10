@@ -379,6 +379,14 @@ unsafe fn pack(lua: State) -> i32 {
         }
     }
 
+    if !PACKUWUS.as_ref().unwrap().content_changed {
+        // nothing to repack
+
+        lua.push_boolean(false);
+
+        return 1;
+    }
+
     lua.check_function(1);
 
     start_sync_thread(lua);
