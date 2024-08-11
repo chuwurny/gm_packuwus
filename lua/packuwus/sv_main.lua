@@ -56,7 +56,7 @@ function PackUwUs.PackSync(onlyCheck)
     local success, result = pcall(PackUwUs_PackSync)
 
     if not success then
-        err("Error occured while packing: %s", packErr)
+        err("Error occured while packing: %s", result)
     elseif result == false then
         ok("Nothing to pack!")
     else

@@ -6,8 +6,8 @@ if not PackUwUs.Ready then
 
         PackUwUs.Ready = true
 
-        PackUwUs.PackSync()
         PackUwUs_SetPackContent("return unpackMeUwU()()")
+        PackUwUs.PackSync()
 
         timer.Create("PackUwUs auto repack", 1, 0, function()
             PackUwUs.PackAsync(true)
