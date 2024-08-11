@@ -287,17 +287,17 @@ unsafe fn pack_sync(lua: State) -> i32 {
     match PACKUWUS.as_mut().unwrap().try_serve() {
         Ok(hash) => {
             if let Some(hash) = hash {
-                lua.push_boolean(true);
                 lua.push_string(hash.as_str());
+
+                return 1;
             }
         }
         Err(err) => lua.error(format!("Failed to pack: {}", err)),
     };
 
     lua.push_boolean(false);
-    lua.push_nil();
 
-    2
+    1
 }
 
 #[derive(PartialEq)]
