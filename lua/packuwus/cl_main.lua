@@ -16,11 +16,34 @@ function PackUwUs.HasFile(path)
     return files[fixedPath] ~= nil
 end
 
-function PackUwUs.GetPackedFilePath()
+function PackUwUs.GetPackedFilePath(noFatalError)
     local filename = "download/data/serve_packuwus/" .. PackUwUs.packuwus_hash:GetString() .. ".bsp"
 
     if not file.Exists(filename, "GAME") then
         err("Cannot get packed file path: packed file doesn't exist!")
+
+        local downloadUrl = GetConVar("sv_downloadurl"):GetString()
+
+        if downloadUrl == "" then
+            err("Server did not set sv_downloadurl!")
+
+            if not noFatalError then
+                PackUwUs.FatalError(PackUwUs.Lang({
+                    en = "Server did not set sv_downloadurl! Contact admins!",
+                    ru = "Сервер не установил sv_downloadurl! Обратись к " ..
+                         "админу!",
+                }))
+            end
+        end
+
+        if not noFatalError then
+            PackUwUs.FatalError(PackUwUs.Lang({
+                en = "No packed file " .. filename .. ". Is website " ..
+                     downloadUrl .. " accessable from this PC?",
+                ru = "Нету запакованного файла " .. filename .. ". Сайт " ..
+                     downloadUrl .. " с компьютера доступен?",
+            }))
+        end
 
         return nil
     end
@@ -28,7 +51,7 @@ function PackUwUs.GetPackedFilePath()
     return filename
 end
 
-function PackUwUs.Unpack()
+function PackUwUs.Unpack(noFatalError)
     local function readString(f)
         local s = ""
 
@@ -55,7 +78,7 @@ function PackUwUs.Unpack()
         files[k] = nil
     end
 
-    local packedFilePath = PackUwUs.GetPackedFilePath()
+    local packedFilePath = PackUwUs.GetPackedFilePath(noFatalError)
 
     if not packedFilePath then
         err("Failed to unpack: no packed file!")
@@ -67,6 +90,13 @@ function PackUwUs.Unpack()
 
     if not f then
         err("Failed to unpack: failed to open \"%s\"", packedFilePath)
+
+        if not noFatalError then
+            PackUwUs.FatalError(PackUwUs.Lang({
+                en = "Failed to open packed file " .. packedFilePath,
+                ru = "Неудалось открыть запакованный файл " .. packedFilePath,
+            }))
+        end
 
         return false
     end
@@ -83,11 +113,32 @@ function PackUwUs.Unpack()
         if not path then
             err("Failed to unpack: unexpected EOF while reading path!")
 
+            if not noFatalError then
+                PackUwUs.FatalError(PackUwUs.Lang({
+                    en = "Failed to read lua file path while unpacking. " ..
+                         "Try to delete file " .. packedFilePath,
+                    ru = "Неудалось прочитать путь к луа файлу при " ..
+                         "распаковке .. Попробуй удалить файл " ..
+                         packedFilePath,
+                }))
+            end
+
             return false
         end
 
         if f:EndOfFile() then
             err("Failed to unpack: unexpected EOF while reading size!")
+
+            if not noFatalError then
+                PackUwUs.FatalError(PackUwUs.Lang({
+                    en = "No more packed data to read. Packed lua files " ..
+                         packedFilePath .. " is corrupted! Delete the file " ..
+                         "and try to connect again",
+                    ru = "Нет данных для чтения. Запакованные луа файлы " ..
+                         packedFilePath .. " были повреждены! Удали файл и " ..
+                         "попробуй зайти снова",
+                }))
+            end
 
             return false
         end
@@ -97,6 +148,17 @@ function PackUwUs.Unpack()
         if f:EndOfFile() then
             err("Failed to unpack: unexpected EOF while reading size of %s!", path)
 
+            if not noFatalError then
+                PackUwUs.FatalError(PackUwUs.Lang({
+                    en = "No more packed data to read. Packed lua files " ..
+                         packedFilePath .. " is corrupted! Delete the file " ..
+                         "and try to connect again",
+                    ru = "Нет данных для чтения. Запакованные луа файлы " ..
+                         packedFilePath .. " были повреждены! Удали файл и " ..
+                         "попробуй зайти снова",
+                }))
+            end
+
             return false
         end
 
@@ -105,6 +167,17 @@ function PackUwUs.Unpack()
         if #content ~= size then
             err("Failed to unpack: readed content size of %s differs (%d != %d)!", path, #content, size)
 
+            if not noFatalError then
+                PackUwUs.FatalError(PackUwUs.Lang({
+                    en = "Packed lua file " .. path .. " got corrupted! " ..
+                         "Delete " .. packedFilePath .. " and try to " ..
+                         "connect again",
+                    ru = "Запакованный луа файл " .. path .. " повреждён! " ..
+                         "Удали " .. packedFilePath .. " и попробуй зайти " ..
+                         "снова",
+                }))
+            end
+
             return false
         end
 
@@ -112,6 +185,15 @@ function PackUwUs.Unpack()
 
         if not content then
             err("Failed to unpack: decompress %s failed!", path)
+
+            if not noFatalError then
+                PackUwUs.FatalError(PackUwUs.Lang({
+                    en = "Failed to decompress lua file " .. path .. ". No " ..
+                         "free RAM?",
+                    ru = "Неудалось распаковать файл " .. path .. ". Нет " ..
+                         "свободной ОЗУ?",
+                }))
+            end
 
             return false
         end
