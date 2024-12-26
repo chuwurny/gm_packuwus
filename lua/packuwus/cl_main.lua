@@ -256,4 +256,6 @@ function PackUwUs.FatalError(msg)
     require("gamemode")
     require("scripted_ents")
     require("weapons")
+
+    error("Fatal PackUwUs error: " .. msg)
 end
