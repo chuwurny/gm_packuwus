@@ -21,6 +21,12 @@ local function removeEmptyLinesAtEOF(lines)
     end
 end
 
+---Trims ...
+---1. Trailing whitespaces
+---2. Empty lines at the end of file
+---
+---@param code string
+---@return string
 function PackUwUs.TrimCode(code)
     local lines = PackUwUs.Lines(code, true)
 

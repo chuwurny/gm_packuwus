@@ -8,6 +8,9 @@ local ok = PackUwUs.Ok
 local err = PackUwUs.Error
 local dbg = PackUwUs.Debug
 
+---Returns `true` if file in this path should be packed
+---@param path string
+---@return boolean
 function PackUwUs.ShouldPack(path)
     path = PackUwUs.FixPath(path)
 
@@ -37,6 +40,10 @@ function PackUwUs.ShouldPack(path)
     return true
 end
 
+---Safe function to pack lua files synchronously. Internally calls
+---`PackUwUs_PackSync`
+---@param onlyCheck boolean? If set to true then it prevents setting
+---`NeedToRepack` to `true`. You can use it to auto repack lua files
 function PackUwUs.PackSync(onlyCheck)
     if PackUwUs.Packing then
         if onlyCheck ~= true then
@@ -66,6 +73,10 @@ function PackUwUs.PackSync(onlyCheck)
     end
 end
 
+---Safe function to pack lua files asynchronously. Internally calls
+---`PackUwUs_PackAsync`
+---@param onlyCheck boolean? If set to true then it prevents setting
+---`NeedToRepack` to `true`. You can use it to auto repack lua files
 function PackUwUs.PackAsync(onlyCheck)
     if PackUwUs.Packing then
         if onlyCheck ~= true then

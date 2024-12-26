@@ -1,19 +1,23 @@
 AddCSLuaFile()
 
 PackUwUs = PackUwUs or {}
+
+--- Hash convar that should be set serverside
 PackUwUs.packuwus_hash = CreateConVar("packuwus_hash", "", FCVAR_REPLICATED)
 
 file.CreateDir("packuwus")
-PackUwUs.LogFileHandle = file.Open("packuwus/log.txt", "w", "DATA")
+PackUwUs.LogFileHandle = file.Open("packuwus/log.txt", "w", "DATA") --[[@as File]]
 
 if not PackUwUs.LogFileHandle then
     print("!!! PackUwUs failed to open \"packuwus/log.txt\" !!!")
 end
 
 local logFileHandle = PackUwUs.LogFileHandle
-local packuwus_debug = CreateConVar("packuwus_debug", "1", FCVAR_ARCHIVE)
-local packuwus_console_debug = CreateConVar("packuwus_console_debug", "0", FCVAR_ARCHIVE)
+local packuwus_debug = CreateConVar("packuwus_debug", "1", FCVAR_ARCHIVE) --[[@as ConVar]]
+local packuwus_console_debug = CreateConVar("packuwus_console_debug", "0", FCVAR_ARCHIVE) --[[@as ConVar]]
 
+---Returns `true` if convar `packuwus_debug` is not zero
+---@return boolean
 function PackUwUs.IsDebugEnabled()
     return packuwus_debug:GetBool()
 end
@@ -25,6 +29,11 @@ local COLOR_OK      = { r = 0,   g = 255, b = 150, a = 255 }
 local COLOR_WARNING = { r = 255, g = 150, b = 0,   a = 255 }
 local COLOR_ERROR   = { r = 255, g = 150, b = 150, a = 255 }
 
+---Logs message into console and to log file
+---@param level string
+---@param color { r: integer, g: integer, b: integer, a: integer }
+---@param fmt string
+---@param ... any
 function PackUwUs.LogEx(level, color, fmt, ...)
     xpcall(function(...)
         if logFileHandle then
@@ -41,28 +50,50 @@ function PackUwUs.LogEx(level, color, fmt, ...)
     end, ErrorNoHaltWithStack, ...)
 end
 
+---Logs debug message
+---@param fmt string
+---@param ... any
 function PackUwUs.Debug(fmt, ...)
     if not PackUwUs.IsDebugEnabled() then return end
 
     PackUwUs.LogEx("D", COLOR_DEBUG, fmt, ...)
 end
 
+---Logs default message
+---@param fmt string
+---@param ... any
 function PackUwUs.Log(fmt, ...)
     PackUwUs.LogEx("LOG", COLOR_DEFAULT, fmt, ...)
 end
 
+---Logs success message
+---@param fmt string
+---@param ... any
 function PackUwUs.Ok(fmt, ...)
     PackUwUs.LogEx("OK", COLOR_OK, fmt, ...)
 end
 
+---Logs warning message
+---@param fmt string
+---@param ... any
 function PackUwUs.Warn(fmt, ...)
     PackUwUs.LogEx("W", COLOR_WARNING, fmt, ...)
 end
 
+---Logs error message
+---@param fmt string
+---@param ... any
 function PackUwUs.Error(fmt, ...)
     PackUwUs.LogEx("E", COLOR_ERROR, fmt, ...)
 end
 
+---Makes `path` relative to non-addon/non-gamemode path
+---
+---addons/myaddon/lua/autorun/test.lua => lua/autorun/test.lua
+---gamemodes/base/entities/someent.lua => lua/entities/someent.lua
+---
+---@param path string
+---@return string
 function PackUwUs.FixPath(path)
     path = string.lower(path)
     path = string.gsub(path, "\\", "/")

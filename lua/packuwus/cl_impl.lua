@@ -7,6 +7,10 @@ local function calleeFilePath()
         "Failed to get function path in main chunk")
 end
 
+---@private
+---Function that will do unpack magic
+---@see PackUwUs_SetPackContent
+---@diagnostic disable-next-line: lowercase-global
 function unpackMeUwU()
     local path = calleeFilePath()
 

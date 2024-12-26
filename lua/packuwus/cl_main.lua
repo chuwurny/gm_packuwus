@@ -1,6 +1,5 @@
---[[
-    { string path = string content }
-]]
+--- { string path = string content }
+---@type { [string]: string }
 PackUwUs.Files = PackUwUs.Files or {}
 
 local files = PackUwUs.Files
@@ -10,12 +9,19 @@ local dbg = PackUwUs.Debug
 local ok = PackUwUs.Ok
 local err = PackUwUs.Error
 
+---Checks if file is packed
+---@param path string
+---@return boolean
 function PackUwUs.HasFile(path)
     local fixedPath = PackUwUs.FixPath(path)
 
     return files[fixedPath] ~= nil
 end
 
+---Returns packed file path relative to GAME. If `noFatalError` is `true` then
+---function may return `nil`
+---@param noFatalError boolean? `true` will not call `PackUwUs.FatalError`
+---@return string?
 function PackUwUs.GetPackedFilePath(noFatalError)
     local filename = "download/data/serve_packuwus/" .. PackUwUs.packuwus_hash:GetString() .. ".bsp"
 
@@ -51,6 +57,10 @@ function PackUwUs.GetPackedFilePath(noFatalError)
     return filename
 end
 
+---Unpacks lua files. `PackUwUs.Files` will be updated. Returns `true` if no
+---error is occured
+---@param noFatalError boolean? `true` will not call `PackUwUs.FatalError`
+---@return boolean
 function PackUwUs.Unpack(noFatalError)
     local function readString(f)
         local s = ""
@@ -86,7 +96,7 @@ function PackUwUs.Unpack(noFatalError)
         return false
     end
 
-    local f = file.Open(packedFilePath, "rb", "GAME")
+    local f = file.Open(packedFilePath, "rb", "GAME") --[[@as File]]
 
     if not f then
         err("Failed to unpack: failed to open \"%s\"", packedFilePath)
@@ -213,6 +223,10 @@ function PackUwUs.Unpack(noFatalError)
     return true
 end
 
+---Compiles lua file into function using `CompileString`. If lua file is not
+---packed then error will be thrown
+---@param path string Path to lua file
+---@return fun(...): ...
 function PackUwUs.LoadFile(path)
     local fixedPath = PackUwUs.FixPath(path)
 
@@ -229,6 +243,8 @@ function PackUwUs.LoadFile(path)
     return CompileString(content, path)
 end
 
+---Disconnects user and show message on the client's screen
+---@param msg string Message to show
 function PackUwUs.FatalError(msg)
     err("FATAL ERROR: %s", msg)
 
