@@ -1,2 +1,5 @@
 /target
 /.cargo
+/.vscode
+
+/.luarc.json
