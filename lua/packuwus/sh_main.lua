@@ -6,6 +6,11 @@ PackUwUs = PackUwUs or {}
 PackUwUs.packuwus_hash = CreateConVar("packuwus_hash", "", FCVAR_REPLICATED)
 
 file.CreateDir("packuwus")
+
+if SERVER then
+    file.CreateDir("serve_packuwus")
+end
+
 PackUwUs.LogFileHandle = file.Open("packuwus/log.txt", "w", "DATA") --[[@as File]]
 
 if not PackUwUs.LogFileHandle then
