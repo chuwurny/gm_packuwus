@@ -238,7 +238,7 @@ function PackUwUs.FatalError(msg)
 
     PackUwUs.FatalFuckUp = true
 
-    gui.OpenURL("http://" .. string.rep(" ", 70) .. msg)
+    gui.OpenURL("http://" .. string.rep(" ", 10) .. msg)
 
     RunConsoleCommand("disconnect")
 
