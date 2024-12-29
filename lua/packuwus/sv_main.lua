@@ -2,6 +2,11 @@ PackUwUs.NeedToRepack = PackUwUs.NeedToRepack or false
 PackUwUs.Ready        = PackUwUs.Ready or false
 PackUwUs.Packing      = PackUwUs.Packing or false
 
+---@type number[]
+PackUwUs._ConnectingUserIDs = PackUwUs._ConnectingUserIDs or {}
+
+local connectUserIDs = PackUwUs._ConnectingUserIDs
+
 local log = PackUwUs.Log
 local warn = PackUwUs.Warn
 local ok = PackUwUs.Ok
@@ -73,19 +78,27 @@ function PackUwUs.PackSync(onlyCheck)
     end
 end
 
-local playerConnectingCount = 0
+local function addConnectingUserID(userID)
+    dbg("Adding connecting user id %d. Now connecting count is %d",
+        userID,
+        #connectUserIDs)
 
-hook.Add("PlayerConnect", "packuwus connecting workaround", function()
-    playerConnectingCount = playerConnectingCount + 1
-end)
+    table.insert(connectUserIDs, userID)
+end
 
-hook.Add("PlayerDisconnected", "packuwus connecting workaround", function()
-    playerConnectingCount = playerConnectingCount - 1
-end)
+local function tryRemoveConnectingUserID(userIDToRemove)
+    for i, userID in ipairs(connectUserIDs) do
+        if userID == userIDToRemove then
+            dbg("Remove connecting user id %d. Now connecting count is %d",
+                userID,
+                #connectUserIDs)
 
-hook.Add("PlayerInitialSpawn", "packuwus connecting workaround", function()
-    playerConnectingCount = playerConnectingCount - 1
-end)
+            table.remove(connectUserIDs, i)
+
+            break
+        end
+    end
+end
 
 ---Safe function to pack lua files asynchronously. Internally calls
 ---`PackUwUs_PackAsync`
@@ -105,16 +118,16 @@ function PackUwUs.PackAsync(onlyCheck)
     local startTime = SysTime()
 
     local packStarted = PackUwUs_PackAsync(function(packErr, hash)
-        local lastPlayerConnectingCount
+        local lastConnectingCount
 
         timer.Create("packuwus async pack wait for players", 1, 0, function()
-            if playerConnectingCount ~= 0 then
-                if lastPlayerConnectingCount ~= playerConnectingCount then
-                    lastPlayerConnectingCount = playerConnectingCount
+            if #connectUserIDs ~= 0 then
+                if lastConnectingCount ~= #connectUserIDs then
+                    lastConnectingCount = #connectUserIDs
 
                     warn("Delaying hash update due to players connecting " ..
                          "(%d)",
-                         playerConnectingCount)
+                         lastConnectingCount)
                 end
 
                 return
@@ -148,3 +161,30 @@ function PackUwUs.PackAsync(onlyCheck)
         PackUwUs.Packing = true
     end
 end
+
+gameevent.Listen("player_connect")
+hook.Add("player_connect", "packuwus connecting workaround", function(data)
+    ---@cast data player_connect
+
+    if data.bot == 1 then return end
+
+    addConnectingUserID(data.userid)
+end)
+
+gameevent.Listen("player_disconnect")
+hook.Add("player_disconnect", "packuwus connecting workaround", function(data)
+    ---@cast data player_disconnect
+
+    if data.bot == 1 then return end
+
+    tryRemoveConnectingUserID(data.userid)
+end)
+
+hook.Add("PlayerInitialSpawn", "packuwus connecting workaround", function(ply)
+    ---@cast ply Player
+
+    if ply:IsBot() then return end
+
+    tryRemoveConnectingUserID(ply:UserID())
+end)
+
