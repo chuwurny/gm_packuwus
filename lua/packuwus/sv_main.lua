@@ -120,6 +120,8 @@ function PackUwUs.PackAsync(onlyCheck)
                 return
             end
 
+            timer.Remove("packuwus async pack wait for players")
+
             PackUwUs.Packing = false
 
             if packErr then
