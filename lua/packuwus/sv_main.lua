@@ -73,6 +73,20 @@ function PackUwUs.PackSync(onlyCheck)
     end
 end
 
+local playerConnectingCount = 0
+
+hook.Add("PlayerConnect", "packuwus connecting workaround", function()
+    playerConnectingCount = playerConnectingCount + 1
+end)
+
+hook.Add("PlayerDisconnected", "packuwus connecting workaround", function()
+    playerConnectingCount = playerConnectingCount - 1
+end)
+
+hook.Add("PlayerInitialSpawn", "packuwus connecting workaround", function()
+    playerConnectingCount = playerConnectingCount - 1
+end)
+
 ---Safe function to pack lua files asynchronously. Internally calls
 ---`PackUwUs_PackAsync`
 ---@param onlyCheck boolean? If set to true then it prevents setting
@@ -91,21 +105,37 @@ function PackUwUs.PackAsync(onlyCheck)
     local startTime = SysTime()
 
     local packStarted = PackUwUs_PackAsync(function(packErr, hash)
-        PackUwUs.Packing = false
+        local lastPlayerConnectingCount
 
-        if packErr then
-            err("Error occured while packing: %s", packErr)
-        else
-            ok("Pack complete in %.2f seconds! Hash is %s", SysTime() - startTime, hash)
+        timer.Create("packuwus async pack wait for players", 1, 0, function()
+            if playerConnectingCount ~= 0 then
+                if lastPlayerConnectingCount ~= playerConnectingCount then
+                    lastPlayerConnectingCount = playerConnectingCount
 
-            PackUwUs.packuwus_hash:SetString(hash)
-        end
+                    warn("Delaying hash update due to players connecting " ..
+                         "(%d)",
+                         playerConnectingCount)
+                end
 
-        if PackUwUs.NeedToRepack then
-            warn("NeedToRepack is set while packing, repacking...")
+                return
+            end
 
-            PackUwUs.PackAsync()
-        end
+            PackUwUs.Packing = false
+
+            if packErr then
+                err("Error occured while packing: %s", packErr)
+            else
+                ok("Pack complete in %.2f seconds! Hash is %s", SysTime() - startTime, hash)
+
+                PackUwUs.packuwus_hash:SetString(hash)
+            end
+
+            if PackUwUs.NeedToRepack then
+                warn("NeedToRepack is set while packing, repacking...")
+
+                PackUwUs.PackAsync()
+            end
+        end)
     end)
 
     if packStarted then

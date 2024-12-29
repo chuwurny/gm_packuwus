@@ -1,6 +1,4 @@
 if not PackUwUs.Ready then
-    require("hook")
-
     hook.Add("InitPostEntity", "packuwus init", function()
         hook.Remove("InitPostEntity", "packuwus init")
 

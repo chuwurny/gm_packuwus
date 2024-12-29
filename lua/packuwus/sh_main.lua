@@ -153,6 +153,8 @@ function PackUwUs.FixPath(path)
     return partPath
 end
 
+require("hook")
+
 AddCSLuaFile("packuwus/sh_utils.lua")
 AddCSLuaFile("packuwus/cl_main.lua")
 AddCSLuaFile("packuwus/cl_impl.lua")
